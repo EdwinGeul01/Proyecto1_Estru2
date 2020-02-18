@@ -5,6 +5,7 @@
 #include <iostream>
 #include <QInputDialog>
 #include <QDir>
+#include <QLabel>
 
 
 showImage::showImage(QWidget *parent) :
@@ -22,7 +23,7 @@ bool showImage::readFileBmp()
     bool OkButton;
     QString text = QInputDialog::getText(this, tr("Lector de Archivos BMP"),
                                          tr("Ingrese Nombre y Ruta del archivo :"), QLineEdit::Normal,
-                                         "./m.bmp", &OkButton);
+                                         "./f16.bmp", &OkButton);
 
 
 
@@ -97,7 +98,7 @@ void showImage::readFileInfoHeader()
     ui->txtArea->insertPlainText("Ancho : " +QString::number(bmp_information.Info_bmp.width) + "\n");
     ui->txtArea->insertPlainText("Alto : " + QString::number(bmp_information.Info_bmp.height) + "\n");
     ui->txtArea->insertPlainText("Numero de planos : " + QString::number(bmp_information.Info_bmp.planes) + "\n");
-    ui->txtArea->insertPlainText("bites por pixeles : " + QString::number(bmp_information.Info_bmp.biSize) + "\n");
+    ui->txtArea->insertPlainText("bites por pixeles : " + QString::number(bmp_information.Info_bmp.bitPix) + "\n");
     ui->txtArea->insertPlainText("Compresion : " + QString::number(bmp_information.Info_bmp.biCompression) + "\n");
     ui->txtArea->insertPlainText("tamaño de la imagen : " + QString::number(bmp_information.Info_bmp.biSizeImage) + "\n");
     ui->txtArea->insertPlainText("numero de Pixeles en X por metro  : " + QString::number(bmp_information.Info_bmp.biXPelsPerMeter) + "\n");
@@ -112,7 +113,54 @@ void showImage::readImage()
 
 {
 
+    if(bmp_information.Info_bmp.bitPix==8){
+            const size_t width=bmp_information.Info_bmp.width;
+            const size_t height=bmp_information.Info_bmp.height;
+            QImage image(width,height,(QImage::Format_Indexed8));
+            image.setColorCount(255);
+            image.invertPixels();
 
+
+            int padding = (width*1 + 3);
+                unsigned char* imagedata = new unsigned char[padding];
+                int y=height-1;
+                QVector<QRgb> tabla;
+
+                for(int i=0;i<256;i++){
+                    tabla.push_back(qRgb(i,i,i));
+                }
+                image.setColorTable(tabla);
+                for(int i = 0; i < height; i++)
+                {
+                    int pos=0;
+
+                    fread(imagedata, sizeof(unsigned char), padding, fp);
+                    for(int j = 0; j < width ; j += 1)
+                    {
+                        image.setPixel(pos,y,(int)imagedata[j]);
+                        pos++;
+                    }
+                    y--;
+                }
+                QLabel lbl;
+                lbl.setPixmap(QPixmap::fromImage(image));
+                lbl.show();
+
+                QGraphicsScene *graphics = new QGraphicsScene(this);
+                QBrush brush(Qt::GlobalColor::white);
+                graphics->setBackgroundBrush(brush);
+                graphics->addPixmap(QPixmap::fromImage(image));
+                ui->graphicsView->setScene(graphics);
+
+                cout << "HASTA AQUI LLEGA";
+                return;
+
+
+    }
+
+
+
+    if (bmp_information.Info_bmp.bitPix==24 || bmp_information.Info_bmp.bitPix==32) {
 
     QImage *image= new QImage(bmp_information.Info_bmp.width,bmp_information.Info_bmp.height,QImage::Format_RGB32);
     image->setDotsPerMeterX(bmp_information.Info_bmp.biXPelsPerMeter);
@@ -153,6 +201,82 @@ void showImage::readImage()
                     colors_bmp.s = (colors_bmp.a/256)%256;
                     colors_bmp.d = colors_bmp.a%256;
                     colors_bmp.a = (colors_bmp.a/(256*256));
+
+
+                  // ui->txtArea->insertPlainText(QString::number(a) + " " +  QString::number(s) +" " + QString::number(d) + "\n");
+
+                    image->setPixel(x,y,qRgb(colors_bmp.a,colors_bmp.s,colors_bmp.d));
+
+
+
+
+                }
+                fread(&colors_bmp.e,1,relleno,fp);
+
+            }
+
+            ui->txtArea->insertPlainText("relleno : " + QString::number(relleno));
+
+
+
+
+
+
+
+
+
+    QGraphicsScene *graphics = new QGraphicsScene(this);
+    QBrush brush(Qt::GlobalColor::white);
+    graphics->setBackgroundBrush(brush);
+    graphics->addPixmap(QPixmap::fromImage(*image));
+    ui->graphicsView->setScene(graphics);
+   // ui->graphicsView->scale(10,10);
+
+}
+
+
+    QImage *image= new QImage(bmp_information.Info_bmp.width,bmp_information.Info_bmp.height,QImage::Format_RGB16);
+    image->setDotsPerMeterX(bmp_information.Info_bmp.biXPelsPerMeter);
+    image->setDotsPerMeterY(bmp_information.Info_bmp.biYPelsPerMeter);
+    image->invertPixels();
+    image->scaledToWidth(bmp_information.Info_bmp.biXPelsPerMeter);
+    image->scaledToHeight(bmp_information.Info_bmp.biYPelsPerMeter);
+ //  image->setDevicePixelRatio(0.4);
+ //   image->setDevicePixelRatio()
+
+
+
+            fseek(fp,bmp_information.header_bmp.imageSataOffset,SEEK_SET);
+
+            int bytesxRow = (bmp_information.Info_bmp.width)*(bmp_information.Info_bmp.bitPix/8);
+            int relleno=0;
+
+
+            while (bytesxRow % 4 != 0) {
+
+                bytesxRow++;
+                relleno ++;
+
+            }
+
+
+
+            for (int y = bmp_information.Info_bmp.height-1; y >0;y--) {
+
+                for (int x = 0; x < bmp_information.Info_bmp.width; x++) {
+
+                    fread(&colors_bmp.a,1,2,fp);
+
+                   // fread(&s,1,3,fp);
+                    //fread(&d,1,3,fp);
+
+
+
+                    colors_bmp.s = (colors_bmp.a << 5);
+                    colors_bmp.d = (colors_bmp.a << 10);
+                    colors_bmp.a = (colors_bmp.a << 15);
+
+
                   // ui->txtArea->insertPlainText(QString::number(a) + " " +  QString::number(s) +" " + QString::number(d) + "\n");
 
                     image->setPixel(x,y,qRgb(colors_bmp.a,colors_bmp.s,colors_bmp.d));

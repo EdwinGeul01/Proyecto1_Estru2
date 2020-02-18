@@ -24,7 +24,7 @@ bool readBmp::readFileBmp()
     bool OkButton;
     QString text = QInputDialog::getText(this, tr("Lector de Archivos BMP"),
                                          tr("Ingrese Nombre y Ruta del archivo :"), QLineEdit::Normal,
-                                         "./m.bmp", &OkButton);
+                                         "./f16.bmp", &OkButton);
 
 
     //IF OK BUTTON IS PRESSED
